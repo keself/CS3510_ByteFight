@@ -83,24 +83,32 @@ class PlayerBoard:
         return True
         
 
-    def can_place_beacon(self, origin, opponent = False):
+    def can_place_beacon(self, origin, opponent=False):
         parity_query = self.opponent_parity if opponent else self.player_parity
-
         if self.board.oob(origin):
             return False
-        
         player = self.get_player(opponent)
         cell = self.board.cells[origin.r][origin.c]
-        if cell.owner_parity != parity_query:
-            return False
-        if cell.beacon_parity != 0:
+        if cell.owner_parity != parity_query or cell.beacon_parity != 0:
             return False
         if player.stamina < GameConstants.BEACON_COST:
             return False
-        
+    
+    
+        useful = False
+        for r in range(max(0, origin.r-2), min(self.board.board_size.r, origin.r+3)):
+            for c in range(max(0, origin.c-2), min(self.board.board_size.c, origin.c+3)):
+                neighbor = self.board.cells[r][c]
+                if neighbor.hill_id != 0 and neighbor.controller_parity != parity_query:
+                    useful = True
+                if neighbor.owner_parity == 0:
+                    useful = True
+        if not useful:
+            return False
+
+    
         window_radius = GameConstants.BEACON_WINDOW_SIZE_P // 2
         window_cells = origin.square_region(window_radius)
-        
         friendly_cells = []
         enemy_cells = []
         opponent_parity = parity_query * -1
@@ -109,15 +117,14 @@ class PlayerBoard:
             if self.board.oob(loc):
                 continue
             candidate = self.board.cells[loc.r][loc.c]
-            if(Parity.unowned(candidate.beacon_parity)):
+            if Parity.unowned(candidate.beacon_parity):
                 if Parity.owned(candidate.paint_value, parity_query):
                     friendly_cells.append(candidate)
                 elif Parity.owned(candidate.paint_value, opponent_parity):
                     enemy_cells.append(candidate)
-        
         if len(friendly_cells) < GameConstants.BEACON_REQUIREMENT_Q:
             return False
-        
+
         return True
 
     def get_valid_non_beacon_moves(self, moves_this_turn = 0,opponent=False):
