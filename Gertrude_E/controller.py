@@ -543,32 +543,32 @@ class PlayerController:
 				paints.append(Action.Paint(target))
 				remaining -= GameConstants.PAINT_STAMINA_COST
 		return paints
-
 	def score_paint_target(self, board: Board, player_parity: int, loc: Location) -> float:
 		cell = board.cells[loc.r][loc.c]
 		score = 0.0
 		opponent_parity = -player_parity
-
-		## new territory
+		
 		if cell.owner_parity == 0:
-			score += 50
+			score += 70  
 		elif cell.owner_parity == opponent_parity:
 			layers = abs(cell.paint_value)
-			score += max(0, GameConstants.MAX_PAINT_LAYERS - layers) * 8
-		
-		## hill bonus
+			score += max(0, GameConstants.MAX_PAINT_LAYERS - layers) * 12  # was 8
 		if cell.hill_id != 0:
 			hill = board.hills[cell.hill_id]
-			# if hill.controller_parity == player_parity:
-			if hill.controller_parity == opponent_parity:
-				## painting toward capturing a hill
-				score += 160
-			elif hill.controller_parity == 0:
-				score += 110
-			else:
-				## reinforcing a hill we control
-				score += 35
-		
+		if hill.controller_parity == opponent_parity:
+			score += 200
+		elif hill.controller_parity == 0:
+			score += 130 
+		else:
+			score += 50  # was 35
+	
+		for d in Direction.cardinals():
+			nloc = loc + d
+			if board.oob(nloc):
+				continue
+			neighbor = board.cells[nloc.r][nloc.c]
+			if neighbor.owner_parity == 0:
+				score += 10
 		return score
 
 	@staticmethod
