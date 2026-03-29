@@ -197,7 +197,7 @@ class PlayerController:
 				continue
 
 			## greedy paint selection after move 1
-			paint_budget = stamina - 25
+			paint_budget = stamina - 40
 			paints = self.choose_paints(board, player_parity, next_loc, paint_budget)
 			actions = [Action.Move(d1)] + paints
 
@@ -459,7 +459,7 @@ class PlayerController:
 		opp_territory = board.get_territory_count(opponent_parity)
 		score += (player_territory - opp_territory) * 4
 
-		## progress towards capturing hills
+		
 		for hill_id, hill in board.hills.items():
 			if hill.controller_parity != player_parity:
 				## contesting or trying to claim hill
@@ -475,7 +475,7 @@ class PlayerController:
 				else:
 					player_cells = -hill.control_negative
 		
-		## bfs proximity to uncontrolled hills
+	
 		dist_map = self.get_dist_map(board, player.loc)
 		for hill_id, hill in board.hills.items():
 			if hill.controller_parity == player_parity:
@@ -490,13 +490,13 @@ class PlayerController:
 					score += priority * 32 / (1 + dist_map[hloc])
 		return score
 	
-	## return bfs distance from all loc to all reachable cells
+	
 	def get_dist_map(self, board: Board, loc: Location) -> Dict[Location, int]:
 		if loc not in self._bfs_cache:
 			self._bfs_cache[loc] = self.compute_dist_map(board, loc)
 		return self._bfs_cache[loc]
 
-	## compute the dist map
+
 	def compute_dist_map(self, board: Board, start: Location) -> Dict[Location, int]:
 		dist: Dict[Location, int] = {start: 0}
 		q: deque = deque([start])
@@ -511,12 +511,12 @@ class PlayerController:
 				q.append(next)
 		return dist
 
-	## returns list of paint actions
+
 	def choose_paints(self, board: Board, player_parity: int, from_loc: Location, budget: int) -> List[Action.Paint]:
 		if budget < GameConstants.PAINT_STAMINA_COST:
 			return []
 		
-		# scored: List[Tuple[float, Location]] = []
+		
 		scored = []
 
 		for d in Direction.cardinals():
@@ -526,12 +526,12 @@ class PlayerController:
 			cell = board.cells[target.r][target.c]
 			if cell.is_wall or cell.beacon_parity != 0:
 				continue
-			# can only pain unowned or owned cells that arent opp owned
+			
 			if cell.owner_parity == -player_parity:
 				continue
 
 			score = self.score_paint_target(board, player_parity, target)
-			if score > 5:
+			if score > 20:
 				scored.append((score, target))
 		
 		scored.sort(key=lambda x: x[0], reverse=True)
@@ -545,30 +545,34 @@ class PlayerController:
 		return paints
 	def score_paint_target(self, board: Board, player_parity: int, loc: Location) -> float:
 		cell = board.cells[loc.r][loc.c]
-		score = 0.0
 		opponent_parity = -player_parity
+		score = 0.0
 		
 		if cell.owner_parity == 0:
-			score += 70  
+			score += 45
 		elif cell.owner_parity == opponent_parity:
 			layers = abs(cell.paint_value)
-			score += max(0, GameConstants.MAX_PAINT_LAYERS - layers) * 12  # was 8
+			score += max(0, GameConstants.MAX_PAINT_LAYERS - layers) * 6 
 		if cell.hill_id != 0:
 			hill = board.hills[cell.hill_id]
 		if hill.controller_parity == opponent_parity:
-			score += 200
+			score += 140
 		elif hill.controller_parity == 0:
-			score += 130 
+			score += 90
 		else:
-			score += 50  # was 35
-	
+			score += 25
+		frontier = False
 		for d in Direction.cardinals():
 			nloc = loc + d
 			if board.oob(nloc):
 				continue
 			neighbor = board.cells[nloc.r][nloc.c]
-			if neighbor.owner_parity == 0:
-				score += 10
+			if neighbor.owner_parity == 0 or neighbor.owner_parity == opponent_parity:
+				frontier = True
+		if frontier:
+			score += 15
+		else:
+			score -= 10 
 		return score
 
 	@staticmethod
