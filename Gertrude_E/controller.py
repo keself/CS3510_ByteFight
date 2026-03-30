@@ -203,7 +203,7 @@ class PlayerController:
 
 			score = self._score_move_bfs(board, player_parity, next_loc)
 			for p in paints:
-				score += self.score_paint_target(board, player_parity, p.location) * 0.25
+				score += self.score_paint_target(board, player_parity, p.location) * 0.35
 			results.append((score, actions))
 
 			## second move option
@@ -267,15 +267,12 @@ class PlayerController:
 		
 		if cell.hill_id != 0:
 			hill = board.hills[cell.hill_id]
-			if hill.controller_parity == opponent_parity:
-				## enemy hill - high priority
-				score += 420
-			elif hill.controller_parity == 0:
-				## neutral hill
-				score += 280
-			else:
-				## our hill - low priority
-				score += 50
+		if hill.controller_parity == opponent_parity:
+			score += 180
+		elif hill.controller_parity == 0:
+			score += 110
+		else:
+			score += 35
 		
 		## powerup - more valuable when stmaina is low
 		if cell.powerup:
@@ -368,14 +365,10 @@ class PlayerController:
 		
 		## territory
 		if cell.owner_parity == 0:
-			## expand to new territory
-			score += 30
-		elif cell.owner_parity == player_parity:
-			## staying in our territory is low value
-			score += 5
-		else:
-			## opponent territory weakens it
-			score += 70
+			score += 60
+		elif cell.owner_parity == opponent_parity:
+			layers = abs(cell.paint_value)
+			score += max(0, GameConstants.MAX_PAINT_LAYERS - layers) * 10
 		
 		## pressure
 		dist = self.manhattan(loc, opponent.loc)
@@ -570,9 +563,9 @@ class PlayerController:
 			if neighbor.owner_parity == 0 or neighbor.owner_parity == opponent_parity:
 				frontier = True
 		if frontier:
-			score += 15
+			score += 12
 		else:
-			score -= 10 
+			score -= 3 
 		return score
 
 	@staticmethod
