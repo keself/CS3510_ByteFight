@@ -24,7 +24,8 @@ class PlayerBoard:
         self.player_parity *=- 1
 
     def get_copy(self, reverse_perspective=False):
-        return PlayerBoard(self.board.get_copy(), self.opponent_parity if reverse_perspective else self.player_parity)
+        new_parity = -self.player_parity if reverse_perspective else self.player_parity
+        return PlayerBoard(self.board.get_copy(), new_parity)
 
     def can_move(self, move: Action, moves_this_turn: int = 0, opponent=False):
         player = self.get_player(opponent)
@@ -35,7 +36,11 @@ class PlayerBoard:
         if(cell.powerup):
             stamina += GameConstants.STAMINA_POWERUP_AMOUNT
 
-        if(stamina < GameConstants.EXTRA_MOVE_COST * moves_this_turn):
+        cost = GameConstants.EXTRA_MOVE_COST * moves_this_turn
+        if move.move_type == MoveType.ERASE:
+            cost += GameConstants.ERASE_STEP_EXTRA_COST
+
+        if stamina < cost:
             return False
         
         if move.move_type == MoveType.ERASE:
@@ -124,7 +129,7 @@ class PlayerBoard:
         return_list = []
 
         for move_type in [MoveType.REGULAR, MoveType.ERASE]:
-            for dir in Direction:
+            for dir in Direction.cardinals():
                 a = Action.Move(direction=dir, move_type=move_type)
                 if(self.can_move(a, moves_this_turn, opponent)):
                     return_list.append(a)

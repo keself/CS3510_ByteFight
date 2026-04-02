@@ -5,7 +5,7 @@ import time
 
 from game import *
 import random
-
+from player_board import PlayerBoard
 
 class PlayerController:
 	"""
@@ -109,7 +109,8 @@ class PlayerController:
 				for i, actions in candidates:
 					if time.time() - start_time >= time_budget:
 						raise TimeoutError()
-					simu_board, ok = board.forecast_turn(player_parity, actions)
+					pboard = PlayerBoard(board, player_parity)
+					simu_board, ok = pboard.forecast_turn(actions)
 					if not ok:
 						continue
 
@@ -322,6 +323,9 @@ class PlayerController:
 
 	## minimax
 	def mini_max(self, board: Board, player_parity: int, depth: int, alpha: float, beta: float, is_opp_turn: bool, start_time: float, time_budget: float) -> float:
+		key = (str(board), depth, is_opp_turn)
+		if key in self.transposition_table:
+			return self.transposition_table[key]
 		if time.time() - start_time >= time_budget:
 			raise TimeoutError()
 		
@@ -336,20 +340,28 @@ class PlayerController:
 				return -1_000_000.0
 		
 		if depth == 0:
-			return self.evaluate_board(board, player_parity)
+			val = self.evaluate_board(board, player_parity)
+			self.transposition_table[key] = val
+			return val
 		
 		curr_parity = -player_parity if is_opp_turn else player_parity
 		candidates = self._get_candidates_fast(board, curr_parity)
 		if not candidates:
-			return self.evaluate_board(board, player_parity)
+			val = self.evaluate_board(board, player_parity)
+			self.transposition_table[key] = val
+			return val
 		
 		if not is_opp_turn:
 			best = float('-inf')
 			for actions in candidates:
-				simu_board, ok = board.forecast_turn(curr_parity, actions)
+				pboard = PlayerBoard(board, player_parity)
+				simu_board, ok = pboard.forecast_turn(actions)
 				if not ok:
 					continue
 				score = self.mini_max(simu_board, player_parity, depth - 1, alpha, beta, True, start_time, time_budget)
+				if score >= 1_000_000:
+					self.transposition_table[key] = score
+					return score
 				if score > best:
 					best = score
 				alpha = max(alpha, score)
@@ -359,7 +371,8 @@ class PlayerController:
 		else:
 			best = float('inf')
 			for actions in candidates:
-				simu_board, ok = board.forecast_turn(curr_parity, actions)
+				pboard = PlayerBoard(board, curr_parity)
+				simu_board, ok = pboard.forecast_turn(actions)
 				if not ok:
 					continue
 				score = self.mini_max(simu_board, player_parity, depth - 1, alpha, beta, False, start_time, time_budget)
@@ -412,7 +425,7 @@ class PlayerController:
 					results.append((score2, [move1, move2] + paints2))
 
 		results.sort(key=lambda x: x[0], reverse=True)
-		return results[:14]
+		return results[:8]
 
 	def _get_candidates_fast(self, board: Board, player_parity: int) -> List[List]:
 		player = board.get_player(player_parity)
@@ -444,7 +457,7 @@ class PlayerController:
 					results.append((score2, [move1, move2] + paints2))
 
 		results.sort(key=lambda x: x[0], reverse=True)
-		return [i for _, i in results[:8]]
+		return [i for _, i in results[:5]]
 
 	def _iter_move_options(self, board, player_parity, from_loc, moves_taken):
 		opponent = board.get_opponent(player_parity)
@@ -460,6 +473,8 @@ class PlayerController:
 				continue
 
 			regular_score = self._score_move(board, player_parity, next_loc, use_erase=False)
+			if not self._move_is_safe(board, player_parity, next_loc):
+				continue
 			yield Action.Move(direction=direction), next_loc, regular_score, base_move_cost
 
 			if player.stamina < base_move_cost + GameConstants.ERASE_STEP_EXTRA_COST:
@@ -470,6 +485,8 @@ class PlayerController:
 				continue
 
 			erase_score = self._score_move(board, player_parity, next_loc, use_erase=True)
+			if not self._move_is_safe(board, player_parity, next_loc):
+				continue
 			yield (
 				Action.Move(direction=direction, move_type=MoveType.ERASE),
 				next_loc,
